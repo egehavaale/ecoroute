@@ -6,7 +6,7 @@ A lightweight, full-stack decision support platform that simulates IoT waste con
 
 ## Technical Overview
 
-Traditional waste management relies on fixed collection schedules regardless of bin fill status. This results in unnecessary fuel consumption, increased carbon emissions, and operational inefficiency.
+Traditional waste management relies on fixed collection schedules regardless of bin fill status. This results in unnecessary fuel consumption, increased carbon emissions,  and operational inefficiency.
 
 **EcoRoute** addresses this by:
 1. Monitoring real-time fill levels via simulated ultrasonic IoT sensors.
