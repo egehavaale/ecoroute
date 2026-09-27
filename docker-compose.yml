@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  ecoroute-app:
+    build: .
+    container_name: ecoroute-tracker
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./ecoroute.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

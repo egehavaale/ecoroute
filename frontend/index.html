@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoRoute | Urban Waste & Logistics Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+          colors: {
+            brand: { 500: '#10b981', 600: '#059669', 700: '#047857' },
+            dark: { 800: '#1e293b', 850: '#162032', 900: '#0f172a', 950: '#0b1120' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+
+    .dark-tiles .leaflet-tile-container img {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) sat(0.3) brightness(0.7);
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: #0f172a !important;
+      color: #f1f5f9 !important;
+      border: 1px solid #334155 !important;
+      border-radius: 0.5rem !important;
+    }
+
+    .leaflet-popup-tip {
+      background: #0f172a !important;
+    }
+  </style>
+</head>
+
+<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <header class="bg-dark-900 border-b border-slate-800 px-4 lg:px-8 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold">
+          <i class="fa-solid fa-truck-ramp-box"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white leading-none">EcoRoute</h1>
+          <p class="text-xs text-slate-400 mt-1">Smart Waste Management System</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-simulate" onclick="simulateIoTPulse()"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 transition-colors">
+          <i class="fa-solid fa-bolt text-amber-400"></i>
+          <span>IoT Simülasyonu</span>
+        </button>
+        <button onclick="resetData()"
+          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300">
+          <i class="fa-solid fa-rotate-right"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-5">
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5">
+        <span class="text-xs text-slate-400 font-medium">Konteyner Sayısı</span>
+        <div id="kpi-total-bins" class="text-2xl font-bold text-white mt-1">--</div>
+      </div>
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5">
+        <span class="text-xs text-slate-400 font-medium">Ortalama Doluluk</span>
+        <div id="kpi-avg-fill" class="text-2xl font-bold text-white mt-1">--%</div>
+      </div>
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5">
+        <span class="text-xs text-slate-400 font-medium">Kritik Seviye (&ge;70%)</span>
+        <div id="kpi-critical-bins" class="text-2xl font-bold text-rose-400 mt-1">--</div>
+      </div>
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5">
+        <span class="text-xs text-slate-400 font-medium">Tahmini CO₂ Tasarrufu</span>
+        <div id="kpi-co2-prevented" class="text-2xl font-bold text-emerald-400 mt-1">-- kg</div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <section
+        class="lg:col-span-7 bg-dark-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[520px]">
+        <div class="p-3 bg-dark-850 border-b border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300">Bursa Pilot Bölge Haritası</span>
+          <button id="btn-optimize-route" onclick="generateOptimizedRoute()"
+            class="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-colors">
+            <i class="fa-solid fa-route mr-1"></i> Rotayı Hesapla
+          </button>
+        </div>
+
+        <div id="map" class="flex-1 w-full dark-tiles z-0"></div>
+      </section>
+
+      <section class="lg:col-span-5 bg-dark-900 border border-slate-800 rounded-xl p-4 flex flex-col h-[520px]">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Konteyner Durumları</h2>
+          <span id="filtered-count" class="text-xs text-slate-400">-- Konteyner</span>
+        </div>
+
+        <div class="mb-3">
+          <input type="text" id="bin-search" placeholder="Konteyner veya ilçe ara..." oninput="applyFilters()"
+            class="w-full bg-dark-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+        </div>
+
+        <div id="bins-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div class="text-center py-8 text-slate-500 text-xs">Yükleniyor...</div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <script>
+    let binsData = [];
+    let map = null;
+    let markersLayer = null;
+    let routePolyline = null;
+    const DEPOT_COORDS = [40.2050, 29.0200];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initMap();
+      fetchBins();
+      fetchStats();
+    });
+
+    function initMap() {
+      map = L.map('map', { zoomControl: true, attributionControl: false }).setView([40.2050, 28.9800], 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+
+      const depotIcon = L.divIcon({
+        className: 'custom-depot',
+        html: `<div class="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-warehouse"></i></div>`,
+        iconSize: [24, 24]
+      });
+      L.marker(DEPOT_COORDS, { icon: depotIcon }).addTo(map).bindPopup('<b class="text-xs">Lojistik Merkezi</b>');
+    }
+
+    async function fetchBins() {
+      try {
+        const res = await fetch('/api/bins');
+        if (!res.ok) throw new Error();
+        binsData = await res.json();
+        renderMapMarkers();
+        renderBinsList();
+      } catch (err) {
+        console.error('API Error');
+      }
+    }
+
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) return;
+        const stats = await res.json();
+        document.getElementById('kpi-total-bins').innerText = stats.total_bins;
+        document.getElementById('kpi-avg-fill').innerText = `${stats.average_fill_level}%`;
+        document.getElementById('kpi-critical-bins').innerText = stats.critical_bins_count;
+      } catch (e) { }
+    }
+
+    function renderMapMarkers() {
+      if (!markersLayer) return;
+      markersLayer.clearLayers();
+
+      binsData.forEach(bin => {
+        const fill = bin.fill_level_percentage;
+        let color = "bg-emerald-500";
+        if (fill >= 80) color = "bg-rose-500";
+        else if (fill >= 50) color = "bg-amber-500";
+
+        const icon = L.divIcon({
+          className: 'bin-marker',
+          html: `<div class="w-6 h-6 rounded-full ${color} text-white flex items-center justify-center text-[10px] font-bold border border-white">${fill}%</div>`,
+          iconSize: [24, 24]
+        });
+
+        const marker = L.marker([bin.latitude, bin.longitude], { icon });
+        marker.bindPopup(`
+          <div class="p-2 text-xs">
+            <b class="block mb-1">${bin.name}</b>
+            <p class="text-slate-400 mb-2">Doluluk: %${fill} (${bin.waste_type})</p>
+            <button onclick="emptyBinAction(${bin.id})" class="w-full py-1 bg-emerald-600 text-white rounded font-medium">Boşalt</button>
+          </div>
+        `);
+        marker.addTo(markersLayer);
+      });
+    }
+
+    function renderBinsList() {
+      const container = document.getElementById('bins-list');
+      const search = (document.getElementById('bin-search')?.value || '').toLowerCase();
+      const filtered = binsData.filter(b => b.name.toLowerCase().includes(search) || b.district.toLowerCase().includes(search));
+
+      document.getElementById('filtered-count').innerText = `${filtered.length} Konteyner`;
+
+      container.innerHTML = filtered.map(bin => `
+        <div class="bg-dark-950 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between text-xs">
+          <div>
+            <div class="font-semibold text-slate-200">${bin.name}</div>
+            <div class="text-[11px] text-slate-500">${bin.district} &bull; ${bin.waste_type}</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-bold ${bin.fill_level_percentage >= 80 ? 'text-rose-400' : 'text-slate-300'}">%${bin.fill_level_percentage}</span>
+            <button onclick="emptyBinAction(${bin.id})" class="px-2 py-1 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white rounded transition-colors">Boşalt</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function applyFilters() { renderBinsList(); }
+
+    async function emptyBinAction(binId) {
+      try {
+        const res = await fetch(`/api/bins/${binId}/empty`, { method: 'POST' });
+        if (!res.ok) throw new Error();
+        await fetchBins();
+        await fetchStats();
+      } catch (err) { alert('İşlem başarısız'); }
+    }
+
+    async function generateOptimizedRoute() {
+      try {
+        const res = await fetch('/api/route/optimize?threshold=70');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        if (routePolyline) map.removeLayer(routePolyline);
+
+        routePolyline = L.polyline(data.polyline_coordinates, { color: '#10b981', weight: 4 }).addTo(map);
+        map.fitBounds(routePolyline.getBounds(), { padding: [30, 30] });
+
+        document.getElementById('kpi-co2-prevented').innerText = `${data.co2_prevented_kg} kg`;
+      } catch (e) { alert('Rota oluşturulamadı'); }
+    }
+
+    async function simulateIoTPulse() {
+      try {
+        await fetch('/api/bins/simulate', { method: 'POST' });
+        await fetchBins();
+        await fetchStats();
+      } catch (e) { }
+    }
+
+    async function resetData() {
+      try {
+        await fetch('/api/bins/seed', { method: 'POST' });
+        await fetchBins();
+        await fetchStats();
+      } catch (e) { }
+    }
+  </script>
+</body>
+
+</html>
